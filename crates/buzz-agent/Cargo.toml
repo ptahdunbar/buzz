@@ -49,6 +49,11 @@ aws-credential-types = "1.2"
 aws-types = "1.2"
 http = "1"
 aws-smithy-runtime-api = "1.7"
+# Default credential provider chain (env vars, AWS_PROFILE / ~/.aws files,
+# SSO, IMDS/ECS/IRSA roles) for Bedrock. rustls (not the default
+# native-tls) keeps buzz-agent's TLS stack uniform across providers;
+# credentials-process supports the `credential_process` config directive.
+aws-config = { version = "1.8.13", default-features = false, features = ["rt-tokio", "rustls", "sso", "credentials-process"] }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31", default-features = false, features = ["signal", "process"] }

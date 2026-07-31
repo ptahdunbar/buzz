@@ -818,15 +818,14 @@ impl Config {
             Provider::Bedrock => {
                 let region = env("AWS_REGION")
                     .or_else(|| env("AWS_DEFAULT_REGION"))
-                    .ok_or_else(|| "config: AWS_REGION required (or AWS_DEFAULT_REGION)".to_string())?;
+                    .ok_or_else(|| {
+                        "config: AWS_REGION required (or AWS_DEFAULT_REGION)".to_string()
+                    })?;
                 let base_url = format!("https://bedrock-runtime.{region}.amazonaws.com");
                 (
                     String::new(), // api_key unused — SigV4 replaces bearer
-                    resolve_model(
-                        buzz_agent_model.as_deref(),
-                        env("BEDROCK_MODEL").as_deref(),
-                    )
-                    .ok_or_else(|| "config: BEDROCK_MODEL required".to_string())?,
+                    resolve_model(buzz_agent_model.as_deref(), env("BEDROCK_MODEL").as_deref())
+                        .ok_or_else(|| "config: BEDROCK_MODEL required".to_string())?,
                     base_url,
                     OpenAiApi::Chat, // Bedrock uses its own Converse API
                 )

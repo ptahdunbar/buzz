@@ -5,11 +5,11 @@ mod builtin;
 pub mod catalog;
 pub mod catalog_bedrock;
 pub mod config;
-pub mod sigv4;
 mod handoff;
 mod hints;
 mod llm;
 mod mcp;
+pub mod sigv4;
 pub mod types;
 mod wire;
 

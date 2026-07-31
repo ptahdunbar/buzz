@@ -160,13 +160,8 @@ impl Llm {
                 parse_openai_with_reasoning_details(v)
             }
             Provider::Bedrock => {
-                let body = bedrock_converse_body(
-                    cfg,
-                    system_prompt,
-                    history,
-                    tools,
-                    effective_model,
-                );
+                let body =
+                    bedrock_converse_body(cfg, system_prompt, history, tools, effective_model);
                 let v = self.post_bedrock(cfg, &body, effective_model).await?;
                 parse_bedrock_converse(v)
             }
@@ -397,11 +392,12 @@ impl Llm {
 
         let region = sigv4::parse_bedrock_region(&cfg.base_url)
             .map_err(|e| AgentError::Llm(format!("Bedrock: {e}")))?;
-        let creds = sigv4::load_aws_credentials()
+        let creds = sigv4::load_aws_credentials(&region)
+            .await
             .map_err(|e| AgentError::Llm(format!("Bedrock: {e}")))?;
 
-        let body_bytes = serde_json::to_vec(body)
-            .map_err(|e| AgentError::Llm(format!("serialize: {e}")))?;
+        let body_bytes =
+            serde_json::to_vec(body).map_err(|e| AgentError::Llm(format!("serialize: {e}")))?;
 
         // Build an http::Request, sign it with SigV4, then convert to reqwest
         let req = http::Request::builder()
@@ -415,8 +411,8 @@ impl Llm {
             .map_err(|e| AgentError::Llm(format!("sign request: {e}")))?;
 
         let (parts, signed_body) = signed.into_parts();
-        let parsed_url = reqwest::Url::parse(&url)
-            .map_err(|e| AgentError::Llm(format!("parse url: {e}")))?;
+        let parsed_url =
+            reqwest::Url::parse(&url).map_err(|e| AgentError::Llm(format!("parse url: {e}")))?;
         let mut rq = reqwest::Request::new(parts.method, parsed_url);
         *rq.headers_mut() = parts.headers;
         *rq.body_mut() = Some(signed_body.into());
@@ -2055,9 +2051,7 @@ fn bedrock_converse_body(
                 }));
             }
             HistoryItem::Assistant {
-                text,
-                tool_calls,
-                ..
+                text, tool_calls, ..
             } => {
                 let mut content: Vec<Value> = Vec::new();
                 if !text.is_empty() {

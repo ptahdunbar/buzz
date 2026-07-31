@@ -10,11 +10,7 @@
 use reqwest::Client;
 use serde_json::Value;
 
-use crate::{
-    config::Config,
-    sigv4,
-    types::AgentError,
-};
+use crate::{config::Config, sigv4, types::AgentError};
 
 /// A discovered model entry: `id` is the Bedrock model ID
 /// (e.g. `anthropic.claude-3-5-sonnet-20241022-v2:0`), `name` is the
@@ -35,7 +31,8 @@ pub struct ModelEntry {
 pub async fn discover_bedrock_models(cfg: &Config) -> Result<Vec<ModelEntry>, AgentError> {
     let region = sigv4::parse_bedrock_region(&cfg.base_url)
         .map_err(|e| AgentError::Llm(format!("Bedrock catalog: {e}")))?;
-    let creds = sigv4::load_aws_credentials()
+    let creds = sigv4::load_aws_credentials(&region)
+        .await
         .map_err(|e| AgentError::Llm(format!("Bedrock catalog: {e}")))?;
 
     let url = format!("https://bedrock.{region}.amazonaws.com/foundation-models");
@@ -71,9 +68,10 @@ pub async fn discover_bedrock_models(cfg: &Config) -> Result<Vec<ModelEntry>, Ag
         )));
     }
 
-    let json: Value = response.json().await.map_err(|e| {
-        AgentError::Llm(format!("Bedrock catalog: parse response: {e}"))
-    })?;
+    let json: Value = response
+        .json()
+        .await
+        .map_err(|e| AgentError::Llm(format!("Bedrock catalog: parse response: {e}")))?;
 
     parse_bedrock_model_list(&json)
 }
@@ -109,14 +107,8 @@ pub(crate) fn parse_bedrock_model_list(json: &Value) -> Result<Vec<ModelEntry>, 
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            let model_name = m
-                .get("modelName")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            let provider = m
-                .get("providerName")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let model_name = m.get("modelName").and_then(|v| v.as_str()).unwrap_or("");
+            let provider = m.get("providerName").and_then(|v| v.as_str()).unwrap_or("");
             ModelEntry {
                 id,
                 name: format!("{model_name} ({provider})"),
@@ -157,10 +149,7 @@ mod tests {
 
         let models = parse_bedrock_model_list(&json).unwrap();
         assert_eq!(models.len(), 2);
-        assert_eq!(
-            models[0].id,
-            "anthropic.claude-3-5-sonnet-20241022-v2:0"
-        );
+        assert_eq!(models[0].id, "anthropic.claude-3-5-sonnet-20241022-v2:0");
         assert_eq!(models[0].name, "Claude 3.5 Sonnet (Anthropic)");
         assert_eq!(models[1].id, "meta.llama3-70b-instruct-v1:0");
         assert_eq!(models[1].name, "Llama 3 70B Instruct (Meta)");
