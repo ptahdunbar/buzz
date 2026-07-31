@@ -532,20 +532,12 @@ fn buzz_agent_requirements(effective: &EffectiveAgentEnv) -> Vec<Requirement> {
                 });
             }
         Some("bedrock") => {
-            // Bedrock uses SigV4 signing via aws-config's default credential
-            // provider chain, not bearer auth — so no single env key is
-            // "the" credential. Any of these sources satisfies the chain:
-            //   - AWS_ACCESS_KEY_ID (+ AWS_SECRET_ACCESS_KEY, checked at
-            //     request time by sigv4::load_aws_credentials)
-            //   - AWS_PROFILE, naming a profile in ~/.aws/credentials or
-            //     ~/.aws/config (including SSO and credential_process)
-            //   - AWS_CONTAINER_CREDENTIALS_RELATIVE_URI /
-            //     AWS_CONTAINER_CREDENTIALS_FULL_URI (ECS task role)
-            //   - AWS_ROLE_ARN + AWS_WEB_IDENTITY_TOKEN_FILE (EKS IRSA)
-            // A bare EC2 instance-profile role (IMDS, no env footprint) is
-            // invisible to this env-only probe — such a deployment will
-            // read as NotReady here even though it works at request time;
-            // there's no env signal to detect it without a network call.
+            // No single "the" credential — aws-config's default chain (see
+            // sigv4::load_aws_credentials) accepts static keys, AWS_PROFILE,
+            // an ECS container role, or EKS IRSA. A bare EC2 instance-profile
+            // role (IMDS) has no env footprint, so it reads NotReady here
+            // even though it works at request time — no way to detect it
+            // without a network call.
             let has_static_keys = !env_key_missing("AWS_ACCESS_KEY_ID");
             let has_profile = !env_key_missing("AWS_PROFILE");
             let has_container_role = !env_key_missing("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI")
@@ -1768,148 +1760,15 @@ mod tests {
         );
     }
 
-    // ── bedrock tests ─────────────────────────────────────────────────────
-
-    #[test]
-    fn buzz_agent_bedrock_with_static_keys_is_ready() {
-        let env = make_env(
-            "buzz-agent",
-            env_with(&[
-                ("BUZZ_AGENT_PROVIDER", "bedrock"),
-                ("BEDROCK_MODEL", "anthropic.claude-3-5-sonnet-20241022-v2:0"),
-                ("AWS_ACCESS_KEY_ID", "AKIDEXAMPLE"),
-                ("AWS_REGION", "us-east-1"),
-            ]),
-        );
-        let result = agent_readiness(&env);
-        assert!(
-            result.is_ready(),
-            "bedrock with static access keys and region should be ready"
-        );
-    }
-
-    #[test]
-    fn buzz_agent_bedrock_with_aws_profile_is_ready() {
-        // AWS_PROFILE (~/.aws/credentials, SSO, credential_process) is a
-        // valid credential source for the default provider chain and must
-        // not be flagged as missing AWS_ACCESS_KEY_ID.
-        let env = make_env(
-            "buzz-agent",
-            env_with(&[
-                ("BUZZ_AGENT_PROVIDER", "bedrock"),
-                ("BEDROCK_MODEL", "anthropic.claude-3-5-sonnet-20241022-v2:0"),
-                ("AWS_PROFILE", "buzz-bedrock"),
-                ("AWS_REGION", "us-east-1"),
-            ]),
-        );
-        let result = agent_readiness(&env);
-        assert!(
-            result.is_ready(),
-            "bedrock with AWS_PROFILE and no static keys should be ready"
-        );
-    }
-
-    #[test]
-    fn buzz_agent_bedrock_with_ecs_container_role_is_ready() {
-        let env = make_env(
-            "buzz-agent",
-            env_with(&[
-                ("BUZZ_AGENT_PROVIDER", "bedrock"),
-                ("BEDROCK_MODEL", "anthropic.claude-3-5-sonnet-20241022-v2:0"),
-                (
-                    "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
-                    "/v2/credentials/example",
-                ),
-                ("AWS_REGION", "us-east-1"),
-            ]),
-        );
-        let result = agent_readiness(&env);
-        assert!(
-            result.is_ready(),
-            "bedrock with an ECS task role and no static keys should be ready"
-        );
-    }
-
-    #[test]
-    fn buzz_agent_bedrock_with_eks_irsa_is_ready() {
-        let env = make_env(
-            "buzz-agent",
-            env_with(&[
-                ("BUZZ_AGENT_PROVIDER", "bedrock"),
-                ("BEDROCK_MODEL", "anthropic.claude-3-5-sonnet-20241022-v2:0"),
-                (
-                    "AWS_ROLE_ARN",
-                    "arn:aws:iam::123456789012:role/buzz-bedrock",
-                ),
-                (
-                    "AWS_WEB_IDENTITY_TOKEN_FILE",
-                    "/var/run/secrets/eks.amazonaws.com/serviceaccount/token",
-                ),
-                ("AWS_REGION", "us-east-1"),
-            ]),
-        );
-        let result = agent_readiness(&env);
-        assert!(
-            result.is_ready(),
-            "bedrock with EKS IRSA env vars and no static keys should be ready"
-        );
-    }
-
-    #[test]
-    fn buzz_agent_bedrock_missing_all_credential_sources_returns_not_ready() {
-        let env = make_env(
-            "buzz-agent",
-            env_with(&[
-                ("BUZZ_AGENT_PROVIDER", "bedrock"),
-                ("BEDROCK_MODEL", "anthropic.claude-3-5-sonnet-20241022-v2:0"),
-                ("AWS_REGION", "us-east-1"),
-            ]),
-        );
-        let result = agent_readiness(&env);
-        assert!(!result.is_ready());
-        assert!(result.requirements().contains(&Requirement::EnvKey {
-            key: "AWS_ACCESS_KEY_ID".to_string()
-        }));
-    }
-
-    #[test]
-    fn buzz_agent_bedrock_missing_region_returns_not_ready() {
-        let env = make_env(
-            "buzz-agent",
-            env_with(&[
-                ("BUZZ_AGENT_PROVIDER", "bedrock"),
-                ("BEDROCK_MODEL", "anthropic.claude-3-5-sonnet-20241022-v2:0"),
-                ("AWS_ACCESS_KEY_ID", "AKIDEXAMPLE"),
-            ]),
-        );
-        let result = agent_readiness(&env);
-        assert!(!result.is_ready());
-        assert!(result.requirements().contains(&Requirement::EnvKey {
-            key: "AWS_REGION".to_string()
-        }));
-    }
-
-    #[test]
-    fn buzz_agent_bedrock_default_region_satisfies_region_requirement() {
-        let env = make_env(
-            "buzz-agent",
-            env_with(&[
-                ("BUZZ_AGENT_PROVIDER", "bedrock"),
-                ("BEDROCK_MODEL", "anthropic.claude-3-5-sonnet-20241022-v2:0"),
-                ("AWS_ACCESS_KEY_ID", "AKIDEXAMPLE"),
-                ("AWS_DEFAULT_REGION", "us-west-2"),
-            ]),
-        );
-        let result = agent_readiness(&env);
-        assert!(
-            result.is_ready(),
-            "AWS_DEFAULT_REGION fallback should satisfy the region requirement"
-        );
-    }
 }
 
-// Goose file-config-aware requirement tests live in a sibling file so this
-// module stays under the desktop file-size ratchet.
+// Goose file-config-aware and Bedrock credential-chain requirement tests
+// live in sibling files so this module stays under the desktop file-size
+// ratchet.
 #[cfg(test)]
 #[path = "readiness_goose_file_config_tests.rs"]
 mod goose_file_config_tests;
+
+#[cfg(test)]
+#[path = "readiness_bedrock_tests.rs"]
+mod bedrock_tests;

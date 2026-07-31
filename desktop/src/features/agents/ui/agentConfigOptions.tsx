@@ -38,6 +38,7 @@ export const NO_RUNTIME_DROPDOWN_VALUE = "__no_runtime__";
 
 const KNOWN_LLM_PROVIDER_IDS = [
   "anthropic",
+  "bedrock",
   "databricks",
   "databricks_v2",
   "openai",
@@ -114,6 +115,21 @@ const PROVIDER_CREDENTIAL_CONFIG: Partial<
     requiredEnvKeys: ["OPENROUTER_API_KEY"],
     secretEnvVar: "OPENROUTER_API_KEY",
   },
+  bedrock: {
+    // AWS_REGION is the one value every credential source still needs — SigV4
+    // signing requires a region regardless of where the credentials come from.
+    // The credential itself is NOT a single secret: aws-config's default chain
+    // accepts AWS_ACCESS_KEY_ID+AWS_SECRET_ACCESS_KEY, OR AWS_PROFILE, OR
+    // container-role env vars, OR IRSA env vars — mutually exclusive sources,
+    // so there is no fixed key list that can represent "the" credential the
+    // way ANTHROPIC_API_KEY does. A bare EC2 instance-profile role (IMDS, no
+    // env footprint at all) is invisible to any env-based check — the backend
+    // readiness gate (readiness.rs) documents the same blind spot — so only
+    // the region is enforced here; AWS credential fields are informative, not
+    // blocking. No secretEnvVar: like Databricks, there's no single plaintext
+    // secret pasted into a top-level API-key field.
+    requiredEnvKeys: ["AWS_REGION"],
+  },
 };
 
 const DEFAULT_MODEL_OPTION: PersonaModelOption = {
@@ -123,6 +139,7 @@ const DEFAULT_MODEL_OPTION: PersonaModelOption = {
 
 export const PERSONA_LLM_PROVIDER_OPTIONS: readonly PersonaModelOption[] = [
   { id: "anthropic", label: "Anthropic" },
+  { id: "bedrock", label: "AWS Bedrock" },
   { id: "openai", label: "OpenAI" },
   { id: "openai-compat", label: "OpenAI-compatible" },
   { id: "openrouter", label: "OpenRouter" },
@@ -284,6 +301,7 @@ export function providerRequiresExplicitModel(
   const trimmedProvider = providerId?.trim() ?? "";
   return (
     trimmedProvider === "anthropic" ||
+    trimmedProvider === "bedrock" ||
     trimmedProvider === "openai" ||
     trimmedProvider === "openai-compat" ||
     trimmedProvider === "openrouter"

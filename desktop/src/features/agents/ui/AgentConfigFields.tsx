@@ -42,7 +42,12 @@ import {
   AgentDropdownSelect,
   AgentModelField,
 } from "@/features/agents/ui/agentConfigControls";
-import { PersonaProviderApiKeyField } from "@/features/agents/ui/PersonaProviderApiKeyField";
+import {
+  buildSecretFieldProps,
+  hasProviderCredentialFields,
+  PersonaProviderCredentialFields,
+  providerCredentialHiddenEnvKeys,
+} from "@/features/agents/ui/PersonaProviderCredentialFields";
 import { usePersonaModelDiscovery } from "@/features/agents/ui/usePersonaModelDiscovery";
 import {
   BUZZ_AGENT_THINKING_EFFORT,
@@ -709,6 +714,10 @@ export function AgentConfigFields({
     </select>
   );
 
+  const advancedHiddenEnvKeys = providerCredentialHiddenEnvKeys(
+    effectiveProvider,
+    apiKeyEnvVar,
+  );
   const providerContent = providerFieldVisible ? (
     <div className={fieldClassName}>
       <label
@@ -743,31 +752,27 @@ export function AgentConfigFields({
 
   const dependentContent = (
     <>
-      {providerFieldVisible && apiKeyEnvVar ? (
-        <div className={blockClassName}>
-          <PersonaProviderApiKeyField
-            disabled={false}
-            inheritedLabel={
-              apiKeyFileSatisfied
-                ? "Set in runtime config"
-                : "Provided by this build"
-            }
-            isInherited={apiKeyInherited}
-            isRequired={!apiKeyInherited && apiKeyValue.length === 0}
-            label={
-              effectiveProvider === "anthropic"
-                ? "Anthropic API Key"
-                : "OpenAI API Key"
-            }
-            onValueChange={(value) =>
-              onConfigChange({
-                ...config,
-                env_vars: { ...config.env_vars, [apiKeyEnvVar]: value },
-              })
-            }
-            value={apiKeyValue}
-          />
-        </div>
+      {providerFieldVisible &&
+      hasProviderCredentialFields(effectiveProvider, apiKeyEnvVar) ? (
+        <PersonaProviderCredentialFields
+          className={blockClassName}
+          disabled={false}
+          effectiveProvider={effectiveProvider}
+          envVars={config.env_vars}
+          isRegionRequired={advancedRequiredEnvKeys.includes("AWS_REGION")}
+          onEnvVarsChange={(next) =>
+            onConfigChange({ ...config, env_vars: next })
+          }
+          resetKey="global"
+          secretField={buildSecretFieldProps(apiKeyEnvVar, {
+            inheritedLabel: apiKeyFileSatisfied
+              ? "Set in runtime config"
+              : "Provided by this build",
+            isInherited: apiKeyInherited,
+            isRequired: !apiKeyInherited && apiKeyValue.length === 0,
+            value: apiKeyValue,
+          })}
+        />
       ) : null}
 
       {/* Model field — omitted only after confirmed successful empty discovery */}
@@ -909,7 +914,7 @@ export function AgentConfigFields({
                 >
                   <EnvVarsEditor
                     fileSatisfiedKeys={advancedFileSatisfiedEnvKeys}
-                    hiddenKeys={apiKeyEnvVar ? [apiKeyEnvVar] : []}
+                    hiddenKeys={advancedHiddenEnvKeys}
                     inheritedRows={bakedGenericRows}
                     inheritedRowsLabel="build"
                     label="Environment variables"
@@ -927,7 +932,7 @@ export function AgentConfigFields({
           ) : advancedOpen ? (
             <EnvVarsEditor
               fileSatisfiedKeys={advancedFileSatisfiedEnvKeys}
-              hiddenKeys={apiKeyEnvVar ? [apiKeyEnvVar] : []}
+              hiddenKeys={advancedHiddenEnvKeys}
               inheritedRows={bakedGenericRows}
               inheritedRowsLabel="build"
               label="Environment variables"

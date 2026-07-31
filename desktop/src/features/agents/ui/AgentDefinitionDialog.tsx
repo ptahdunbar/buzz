@@ -18,7 +18,11 @@ import type { EnvVarsValue } from "./EnvVarsEditor";
 import { PersonaAdvancedFields } from "./PersonaAdvancedFields";
 import { PersonaModelField } from "./PersonaModelField";
 import { runtimeAvailabilityWarning } from "./runtimeAvailabilityWarning";
-import { PersonaProviderApiKeyField } from "./PersonaProviderApiKeyField";
+import {
+  buildSecretFieldProps,
+  PersonaProviderCredentialFields,
+  providerCredentialHiddenEnvKeys,
+} from "./PersonaProviderCredentialFields";
 import {
   canSubmitPersonaDialog,
   formatPersonaNamePoolText,
@@ -187,6 +191,8 @@ export function AgentDefinitionDialog({
     [globalConfig.preferred_runtime, runtimes],
   );
   const isCreateMode = Boolean(initialValues && !("id" in initialValues));
+  const personaResetKey =
+    initialValues && "id" in initialValues ? initialValues.id : "create";
   const shouldReduceMotion = useReducedMotion();
   const initialModelProviderEditableWithoutRuntime = Boolean(
     initialValues &&
@@ -455,6 +461,8 @@ export function AgentDefinitionDialog({
   // satisfied keys so no further filtering is needed.
   const { requiredEnvKeys } = localModeGate;
   const localModeSatisfied = localModeGate.satisfied;
+  const bedrockRegionRequired =
+    localModeGate.missingEnvKeys.includes("AWS_REGION");
   // Effective provider: agent value → global fallback → file fallback.
   // Mirrors the chain inside computeLocalModeGate so model-option scoping and
   // model requiredness are consistent with the readiness gate.
@@ -902,26 +910,20 @@ export function AgentDefinitionDialog({
                 </div>
               ) : null}
 
-              {llmProviderFieldVisible &&
-              aiConfigurationMode === "custom" &&
-              topLevelSecretEnvVar ? (
-                <PersonaProviderApiKeyField
+              {llmProviderFieldVisible && aiConfigurationMode === "custom" ? (
+                <PersonaProviderCredentialFields
                   disabled={isPending}
-                  isInherited={apiKeyIsInherited}
-                  inheritedLabel={apiKeyInheritedLabel}
-                  isRequired={apiKeyIsRequired}
-                  label={
-                    effectiveProvider === "anthropic"
-                      ? "Anthropic API key"
-                      : "OpenAI API key"
-                  }
-                  onValueChange={(next) => {
-                    setEnvVars((prev) => ({
-                      ...prev,
-                      [topLevelSecretEnvVar]: next,
-                    }));
-                  }}
-                  value={apiKeyValue}
+                  effectiveProvider={effectiveProvider}
+                  envVars={envVars}
+                  isRegionRequired={bedrockRegionRequired}
+                  onEnvVarsChange={setEnvVars}
+                  resetKey={personaResetKey}
+                  secretField={buildSecretFieldProps(topLevelSecretEnvVar, {
+                    inheritedLabel: apiKeyInheritedLabel,
+                    isInherited: apiKeyIsInherited,
+                    isRequired: apiKeyIsRequired,
+                    value: apiKeyValue,
+                  })}
                 />
               ) : null}
 
@@ -1015,9 +1017,10 @@ export function AgentDefinitionDialog({
                       disabled={isPending}
                       envVars={envVars}
                       fileSatisfiedEnvKeys={localModeGate.fileSatisfiedEnvKeys}
-                      hiddenEnvKeys={
-                        topLevelSecretEnvVar ? [topLevelSecretEnvVar] : []
-                      }
+                      hiddenEnvKeys={providerCredentialHiddenEnvKeys(
+                        effectiveProvider,
+                        topLevelSecretEnvVar,
+                      )}
                       inheritedEnvVars={inheritedEnvVarsForAdvanced}
                       model={model}
                       modelTuningRuntimeId={runtime}

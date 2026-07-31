@@ -5,6 +5,10 @@ import {
   getDefaultPersonaRuntime,
   getPersonaModelOptions,
   getPersonaProviderOptions,
+  getProviderApiKeyEnvVar,
+  PERSONA_LLM_PROVIDER_OPTIONS,
+  providerRequiresExplicitModel,
+  requiredCredentialEnvKeys,
   resetConfigForHarnessChange,
   runtimeSupportsLlmProviderSelection,
 } from "./agentConfigOptions.tsx";
@@ -219,6 +223,54 @@ test("getPersonaModelOptions for buzz-agent with no provider returns default mod
   const options = getPersonaModelOptions("buzz-agent", "");
   assert.equal(options.length, 1);
   assert.equal(options[0]?.id, "");
+});
+
+// ── bedrock provider registration ─────────────────────────────────────────────
+//
+// Bedrock's credential model has no single secret env var (aws-config's
+// default chain accepts static keys, OR an AWS_PROFILE, OR an ambient IAM
+// role — mutually exclusive sources), unlike anthropic/openai/openrouter.
+// These mirror the Rust readiness.rs bedrock test coverage for the parts
+// representable at this layer (dropdown presence, required keys, no secret,
+// explicit-model requirement).
+
+test("PERSONA_LLM_PROVIDER_OPTIONS includes bedrock", () => {
+  const ids = PERSONA_LLM_PROVIDER_OPTIONS.map((o) => o.id);
+  assert.ok(ids.includes("bedrock"), "bedrock present in the provider list");
+});
+
+test("requiredCredentialEnvKeys for buzz-agent + bedrock requires only AWS_REGION", () => {
+  const keys = requiredCredentialEnvKeys("buzz-agent", "bedrock");
+  assert.deepEqual(
+    keys,
+    ["AWS_REGION"],
+    "region is the only unconditionally required key — the credential " +
+      "itself has multiple mutually exclusive sources with no single key",
+  );
+});
+
+test("getProviderApiKeyEnvVar returns null for bedrock", () => {
+  // No single plaintext secret — same shape as Databricks (OAuth PKCE, no
+  // secretEnvVar). This is what suppresses PersonaProviderApiKeyField for
+  // bedrock in favor of PersonaProviderBedrockFields.
+  assert.equal(getProviderApiKeyEnvVar("bedrock"), null);
+});
+
+test("providerRequiresExplicitModel is true for bedrock", () => {
+  // discover_bedrock_models() populates a real catalog, so bedrock behaves
+  // like anthropic/openai/openrouter — the zero-value model option is
+  // filtered out and a concrete model must be selected.
+  assert.equal(providerRequiresExplicitModel("bedrock"), true);
+});
+
+test("getPersonaModelOptions for buzz-agent with bedrock filters out zero-value default", () => {
+  const options = getPersonaModelOptions("buzz-agent", "bedrock");
+  const zeroValue = options.find((o) => o.id === "");
+  assert.equal(
+    zeroValue,
+    undefined,
+    "explicit-model provider must not allow zero-value selection",
+  );
 });
 
 // ── formatModelDiscoveryErrorStatus — runtime unavailable ────────────────────

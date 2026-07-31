@@ -131,7 +131,10 @@ export function getProviderEffortConfig(
   if (provider === "openrouter") {
     return { validValues: ALL_VALUES, defaultValue: "medium" };
   }
-  // openai-compat, unknown, empty — all values, default medium.
+  // bedrock, openai-compat, unknown, empty — all values, default medium.
+  // Note: bedrock_converse_body (llm.rs) does not yet read cfg.thinking_effort
+  // for the Converse API request, so this control is currently a no-op for
+  // Bedrock server-side — same unmodeled-effort situation as openai-compat.
   return { validValues: ALL_VALUES, defaultValue: "medium" };
 }
 

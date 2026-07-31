@@ -70,7 +70,11 @@ import {
   MODEL_DISCOVERY_LOADING_VALUE,
   usePersonaModelDiscovery,
 } from "./usePersonaModelDiscovery";
-import { PersonaProviderApiKeyField } from "./PersonaProviderApiKeyField";
+import {
+  buildSecretFieldProps,
+  PersonaProviderCredentialFields,
+  providerCredentialHiddenEnvKeys,
+} from "./PersonaProviderCredentialFields";
 import {
   getBakedModelInheritLabel,
   getBakedProviderInheritLabel,
@@ -1058,24 +1062,20 @@ export function AgentInstanceEditDialog({
               </div>
             ) : null}
 
-            {llmProviderFieldVisible && topLevelSecretEnvVar ? (
-              <PersonaProviderApiKeyField
+            {llmProviderFieldVisible ? (
+              <PersonaProviderCredentialFields
                 disabled={updateMutation.isPending}
-                isInherited={apiKeyIsInherited}
-                inheritedLabel={apiKeyInheritedLabel}
-                isRequired={apiKeyIsRequired}
-                label={
-                  effectiveProvider === "anthropic"
-                    ? "Anthropic API Key"
-                    : "OpenAI API Key"
-                }
-                onValueChange={(next) => {
-                  setEnvVars((prev) => ({
-                    ...prev,
-                    [topLevelSecretEnvVar]: next,
-                  }));
-                }}
-                value={apiKeyValue}
+                effectiveProvider={effectiveProvider}
+                envVars={envVars}
+                isRegionRequired={requiredEnvKeys.includes("AWS_REGION")}
+                onEnvVarsChange={setEnvVars}
+                resetKey={agent.pubkey}
+                secretField={buildSecretFieldProps(topLevelSecretEnvVar, {
+                  inheritedLabel: apiKeyInheritedLabel,
+                  isInherited: apiKeyIsInherited,
+                  isRequired: apiKeyIsRequired,
+                  value: apiKeyValue,
+                })}
               />
             ) : null}
 
@@ -1184,9 +1184,10 @@ export function AgentInstanceEditDialog({
                       disabled={updateMutation.isPending}
                       envVars={envVars}
                       fileSatisfiedEnvKeys={fileSatisfiedEnvKeys}
-                      hiddenEnvKeys={
-                        topLevelSecretEnvVar ? [topLevelSecretEnvVar] : []
-                      }
+                      hiddenEnvKeys={providerCredentialHiddenEnvKeys(
+                        effectiveProvider,
+                        topLevelSecretEnvVar,
+                      )}
                       focusKey={
                         initialFocus?.type === "env_key"
                           ? initialFocus.key
