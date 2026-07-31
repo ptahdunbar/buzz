@@ -110,8 +110,14 @@ moka    = { version = "0.12", features = ["sync"] }
 # Async stream utilities
 futures-util = "0.3"
 
-# WebSocket client (test client)
-tokio-tungstenite = { version = "0.29", features = ["rustls-tls-webpki-roots"] }
+# WebSocket client (buzz-acp, buzz-ws-client, pairing/test clients).
+# rustls-tls-native-roots (not webpki-roots): reads the OS trust store, so
+# TLS-intercepting corporate proxies (Zscaler, etc.) that inject a root CA
+# into the system keychain are trusted here the same way curl trusts them.
+# webpki-roots only trusts Mozilla's bundled CA list, so every wss:// relay
+# connection from these crates failed under such a proxy with an opaque
+# "invalid peer certificate: UnknownIssuer" (plain ws:// was unaffected).
+tokio-tungstenite = { version = "0.29", features = ["rustls-tls-native-roots"] }
 url = "2"
 
 # Property-based testing (dev-only)
