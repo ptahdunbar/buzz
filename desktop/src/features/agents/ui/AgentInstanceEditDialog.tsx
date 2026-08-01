@@ -73,7 +73,7 @@ import {
 import {
   buildSecretFieldProps,
   PersonaProviderCredentialFields,
-  providerCredentialHiddenEnvKeys,
+  providerCredentialHiddenEnvKeys as hiddenKeysFor,
 } from "./PersonaProviderCredentialFields";
 import {
   getBakedModelInheritLabel,
@@ -452,9 +452,10 @@ export function AgentInstanceEditDialog({
     inheritedLabel: apiKeyInheritedLabel,
     isInherited: apiKeyIsInherited,
     isRequired: apiKeyIsRequired,
-    secretEnvVar: topLevelSecretEnvVar,
+    secretEnvVar,
     value: apiKeyValue,
   } = apiKeyFieldState;
+  const hiddenEnvKeys = hiddenKeysFor(effectiveProvider, secretEnvVar);
   // Clear model when provider scope changes and current model is no longer valid.
   React.useEffect(() => {
     if (
@@ -940,7 +941,7 @@ export function AgentInstanceEditDialog({
               </div>
             </div>
 
-            {/* Who can talk to this agent */}
+            {/* Who can send instructions */}
             <CreateAgentRespondToField
               allowlist={respondToAllowlist}
               disabled={updateMutation.isPending}
@@ -1070,7 +1071,7 @@ export function AgentInstanceEditDialog({
                 isRegionRequired={requiredEnvKeys.includes("AWS_REGION")}
                 onEnvVarsChange={setEnvVars}
                 resetKey={agent.pubkey}
-                secretField={buildSecretFieldProps(topLevelSecretEnvVar, {
+                secretField={buildSecretFieldProps(secretEnvVar, {
                   inheritedLabel: apiKeyInheritedLabel,
                   isInherited: apiKeyIsInherited,
                   isRequired: apiKeyIsRequired,
@@ -1184,10 +1185,7 @@ export function AgentInstanceEditDialog({
                       disabled={updateMutation.isPending}
                       envVars={envVars}
                       fileSatisfiedEnvKeys={fileSatisfiedEnvKeys}
-                      hiddenEnvKeys={providerCredentialHiddenEnvKeys(
-                        effectiveProvider,
-                        topLevelSecretEnvVar,
-                      )}
+                      hiddenEnvKeys={hiddenEnvKeys}
                       focusKey={
                         initialFocus?.type === "env_key"
                           ? initialFocus.key

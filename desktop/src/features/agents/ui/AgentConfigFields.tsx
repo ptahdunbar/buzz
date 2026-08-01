@@ -714,7 +714,7 @@ export function AgentConfigFields({
     </select>
   );
 
-  const advancedHiddenEnvKeys = providerCredentialHiddenEnvKeys(
+  const hiddenEnvKeys = providerCredentialHiddenEnvKeys(
     effectiveProvider,
     apiKeyEnvVar,
   );
@@ -760,9 +760,7 @@ export function AgentConfigFields({
           effectiveProvider={effectiveProvider}
           envVars={config.env_vars}
           isRegionRequired={advancedRequiredEnvKeys.includes("AWS_REGION")}
-          onEnvVarsChange={(next) =>
-            onConfigChange({ ...config, env_vars: next })
-          }
+          onEnvVarsChange={handleEnvVarsChange}
           resetKey="global"
           secretField={buildSecretFieldProps(apiKeyEnvVar, {
             inheritedLabel: apiKeyFileSatisfied
@@ -914,7 +912,7 @@ export function AgentConfigFields({
                 >
                   <EnvVarsEditor
                     fileSatisfiedKeys={advancedFileSatisfiedEnvKeys}
-                    hiddenKeys={advancedHiddenEnvKeys}
+                    hiddenKeys={hiddenEnvKeys}
                     inheritedRows={bakedGenericRows}
                     inheritedRowsLabel="build"
                     label="Environment variables"
@@ -932,7 +930,7 @@ export function AgentConfigFields({
           ) : advancedOpen ? (
             <EnvVarsEditor
               fileSatisfiedKeys={advancedFileSatisfiedEnvKeys}
-              hiddenKeys={advancedHiddenEnvKeys}
+              hiddenKeys={hiddenEnvKeys}
               inheritedRows={bakedGenericRows}
               inheritedRowsLabel="build"
               label="Environment variables"

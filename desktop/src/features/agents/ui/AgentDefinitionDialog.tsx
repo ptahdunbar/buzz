@@ -21,7 +21,7 @@ import { runtimeAvailabilityWarning } from "./runtimeAvailabilityWarning";
 import {
   buildSecretFieldProps,
   PersonaProviderCredentialFields,
-  providerCredentialHiddenEnvKeys,
+  providerCredentialHiddenEnvKeys as hiddenKeysFor,
 } from "./PersonaProviderCredentialFields";
 import {
   canSubmitPersonaDialog,
@@ -461,8 +461,7 @@ export function AgentDefinitionDialog({
   // satisfied keys so no further filtering is needed.
   const { requiredEnvKeys } = localModeGate;
   const localModeSatisfied = localModeGate.satisfied;
-  const bedrockRegionRequired =
-    localModeGate.missingEnvKeys.includes("AWS_REGION");
+  const regionRequired = localModeGate.missingEnvKeys.includes("AWS_REGION");
   // Effective provider: agent value → global fallback → file fallback.
   // Mirrors the chain inside computeLocalModeGate so model-option scoping and
   // model requiredness are consistent with the readiness gate.
@@ -483,9 +482,10 @@ export function AgentDefinitionDialog({
     inheritedLabel: apiKeyInheritedLabel,
     isInherited: apiKeyIsInherited,
     isRequired: apiKeyIsRequired,
-    secretEnvVar: topLevelSecretEnvVar,
+    secretEnvVar,
     value: apiKeyValue,
   } = apiKeyFieldState;
+  const hiddenEnvKeys = hiddenKeysFor(effectiveProvider, secretEnvVar);
   const providerIsRequired =
     aiConfigurationMode === "custom" && runtimeCanChooseLlmProvider;
   const modelFieldVisible =
@@ -915,10 +915,10 @@ export function AgentDefinitionDialog({
                   disabled={isPending}
                   effectiveProvider={effectiveProvider}
                   envVars={envVars}
-                  isRegionRequired={bedrockRegionRequired}
+                  isRegionRequired={regionRequired}
                   onEnvVarsChange={setEnvVars}
                   resetKey={personaResetKey}
-                  secretField={buildSecretFieldProps(topLevelSecretEnvVar, {
+                  secretField={buildSecretFieldProps(secretEnvVar, {
                     inheritedLabel: apiKeyInheritedLabel,
                     isInherited: apiKeyIsInherited,
                     isRequired: apiKeyIsRequired,
@@ -1017,10 +1017,7 @@ export function AgentDefinitionDialog({
                       disabled={isPending}
                       envVars={envVars}
                       fileSatisfiedEnvKeys={localModeGate.fileSatisfiedEnvKeys}
-                      hiddenEnvKeys={providerCredentialHiddenEnvKeys(
-                        effectiveProvider,
-                        topLevelSecretEnvVar,
-                      )}
+                      hiddenEnvKeys={hiddenEnvKeys}
                       inheritedEnvVars={inheritedEnvVarsForAdvanced}
                       model={model}
                       modelTuningRuntimeId={runtime}
